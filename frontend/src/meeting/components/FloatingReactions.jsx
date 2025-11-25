@@ -1,9 +1,7 @@
-export default function FloatingReactions({ floatingReactions = [] }) {
-  if (!Array.isArray(floatingReactions)) return null;
-
+export default function FloatingReactions({ items }) {
   return (
     <>
-      {floatingReactions.map((r) => (
+      {items.map((r) => (
         <div
           key={r.id}
           className="absolute bottom-10 left-1/2 -translate-x-1/2 text-5xl animate-float z-50"

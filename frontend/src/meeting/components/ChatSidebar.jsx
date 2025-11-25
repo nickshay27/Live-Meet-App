@@ -16,21 +16,23 @@ export default function ChatSidebar({
       </header>
 
       {/* 🔽 TARGET SELECT (Everyone / User) */}
-      <div className="p-3 border-b border-slate-800">
-        <select
-          value={chatTarget}
-          onChange={(e) => setChatTarget(e.target.value)}
-          className="w-full bg-slate-800 p-2 rounded text-xs"
-        >
-          <option value="everyone">Everyone</option>
+    {/* TARGET SELECT */}
+<div className="p-3 border-b border-slate-800">
+  <select
+    value={chatTarget}
+    onChange={(e) => setChatTarget(e.target.value)}
+    className="w-full bg-slate-800 p-2 rounded text-xs"
+  >
+    <option value="everyone">Everyone</option>
 
-          {Object.entries(participants).map(([socketId, user]) => (
-            <option key={socketId} value={socketId}>
-              {user.name} (Private)
-            </option>
-          ))}
-        </select>
-      </div>
+    {Object.entries(participants || {}).map(([socketId, user]) => (
+      <option key={socketId} value={socketId}>
+        {user?.name || "User"} (Private)
+      </option>
+    ))}
+  </select>
+</div>
+
 
       {/* MESSAGES */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3 text-xs">
