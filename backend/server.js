@@ -4,14 +4,35 @@ import jwt from "jsonwebtoken";
 import { createApp } from "./src/app.js";
 import { config } from "./src/config.js";
 import { getPool } from "./src/db.js";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const start = async () => {
   const app = await createApp();
   const server = http.createServer(app);
 
+  // 👇 Allowed origins (local + production frontend)
+  const allowedOrigins = [
+    "http://localhost:5173",
+    process.env.FRONTEND_URL,            // << add this in Render env
+  ].filter(Boolean);
+
+  console.log("Allowed Origins for Socket.IO:", allowedOrigins);
+
   const io = new Server(server, {
     cors: {
-      origin: "http://localhost:5173",
+      origin: function (origin, callback) {
+        if (!origin) return callback(null, true); // Postman, mobile, curl
+
+        if (allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          console.log("❌ Socket.IO CORS Reject:", origin);
+          callback(new Error("Not allowed by CORS"), false);
+        }
+      },
+      credentials: true,
       methods: ["GET", "POST"]
     }
   });
