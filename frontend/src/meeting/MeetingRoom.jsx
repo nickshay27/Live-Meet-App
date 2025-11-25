@@ -1,25 +1,29 @@
-import { useState } from "react";
-import { useAuth } from "../contexts/AuthContext.jsx";
-
 import Header from "./components/Header";
 import VideoGrid from "./components/VideoGrid";
 import ChatSidebar from "./components/ChatSidebar";
 import ReactionMenu from "./components/ReactionMenu";
-import ControlsBar from "./components/ControlsBar";
-import FloatingReactions from "./components/FloatingReactions";
 
 import useWebRTC from "./hooks/useWebRTC";
 import useReactions from "./hooks/useReactions";
 
 import "./styles/MeetingRoom.css";
 import "./styles/reactions.css";
+import {
+  Mic,
+  MicOff,
+  Camera,
+  CameraOff,
+  MonitorUp,
+  Hand,
+  SmilePlus,
+  LogOut
+} from "lucide-react";
+import { useParams } from "react-router-dom";
+
 
 export default function MeetingRoom() {
-  const { user } = useAuth();
-
   const {
     meeting,
-    error,
     participants,
     localVideoRef,
     remoteStreams,
@@ -27,15 +31,13 @@ export default function MeetingRoom() {
     chatInput,
     setChatInput,
     sendMessage,
-    notifyTyping,
     micOn,
     cameraOn,
     toggleTrack,
     screenSharing,
     toggleScreenShare,
     leave,
-    typingUser,
-    selfSocketId,
+    error
   } = useWebRTC();
 
   const {
@@ -43,75 +45,34 @@ export default function MeetingRoom() {
     setShowReactionMenu,
     floatingReactions,
     sendReaction,
-    raiseHand,
+    raiseHand
   } = useReactions();
+    const { code } = useParams();
 
-  // Chat target: "all" or socketId
-  const [selectedTarget, setSelectedTarget] = useState("all");
-
-  // Mobile chat toggle (Option A: desktop always visible)
-  const [showMobileChat, setShowMobileChat] = useState(false);
-
-  // Simple DM unread counter
-  const [dmUnread, setDmUnread] = useState(0);
-
-  // Increase unread when a new private message comes for me
-  // (very simple: based on last message)
-  if (messages.length) {
-    const last = messages[messages.length - 1];
-    if (
-      last.isPrivate &&
-      last.to === selfSocketId &&
-      last.from !== selfSocketId &&
-      dmUnread === 0 && // avoid infinite loop; very simple logic
-      selectedTarget !== last.from
-    ) {
-      // eslint-disable-next-line no-set-state
-      setDmUnread(1);
-    }
-  }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-[70vh]">
-        <p className="text-sm text-red-400 mb-2">{error}</p>
-        <button
-          onClick={leave}
-          className="px-3 py-1 text-xs rounded-full bg-slate-800 hover:bg-slate-700"
-        >
-          Back to dashboard
-        </button>
+      <div className="error-screen">
+        <p>{error}</p>
+        <button onClick={leave}>Back to Dashboard</button>
       </div>
     );
   }
 
-  const handleToggleChat = () => {
-    setShowMobileChat((prev) => !prev);
-    setDmUnread(0);
-  };
-
-  const handleSelectTarget = (value) => {
-    setSelectedTarget(value);
-    setDmUnread(0);
-  };
-
   return (
-    <div className="meeting-layout relative">
+    <div className="meeting-layout">
 
-      {/* LEFT AREA: video + controls */}
+      {/* LEFT AREA */}
       <div className="video-area">
 
-        {/* Header */}
-        <Header meeting={meeting} participants={participants} />
+        <Header meeting={meeting} participants={participants} code={code} />
 
-        {/* Videos */}
         <VideoGrid
           localVideoRef={localVideoRef}
           remoteStreams={remoteStreams}
           participants={participants}
         />
 
-        {/* Reaction picker */}
         <ReactionMenu
           show={showReactionMenu}
           onSelect={(emoji) => {
@@ -120,63 +81,91 @@ export default function MeetingRoom() {
           }}
         />
 
-        {/* Floating reactions */}
-        <FloatingReactions floatingReactions={floatingReactions} />
+    
+    {floatingReactions.map((r) => (
+  <div
+    key={r.id}
+    className="absolute bottom-10 left-1/2 -translate-x-1/2 text-5xl animate-float z-50"
+  >
+    {r.emoji}
+  </div>
+))}
 
-        {/* Controls bar */}
-        <ControlsBar
-          micOn={micOn}
-          cameraOn={cameraOn}
-          toggleTrack={toggleTrack}
-          screenSharing={screenSharing}
-          toggleScreenShare={toggleScreenShare}
-          raiseHand={raiseHand}
-          onToggleReactions={() => setShowReactionMenu((v) => !v)}
-          onLeave={leave}
-          onToggleChat={handleToggleChat}
-          dmUnread={dmUnread}
-        />
+        {/* FOOTER CONTROLS */}
+    <div className="control-bar flex items-center justify-center gap-6 border-t border-slate-800 bg-slate-900 px-4 py-4">
+
+  {/* MIC */}
+  <button onClick={() => toggleTrack("audio")} className="control-btn">
+    {micOn ? <Mic size={18} /> : <MicOff size={18} />}
+    <span>{micOn ? "Mic On" : "Mic Off"}</span>
+  </button>
+
+  {/* CAMERA */}
+  <button onClick={() => toggleTrack("video")} className="control-btn">
+    {cameraOn ? <Camera size={18} /> : <CameraOff size={18} />}
+    <span>{cameraOn ? "Camera On" : "Camera Off"}</span>
+  </button>
+
+  {/* SCREEN SHARE */}
+  <button onClick={toggleScreenShare} className="control-btn">
+    <MonitorUp size={18} className={screenSharing ? "text-green-400" : ""} />
+    <span>{screenSharing ? "Sharing" : "Share"}</span>
+  </button>
+
+  {/* HAND */}
+  <button onClick={raiseHand} className="control-btn">
+    <Hand size={18} />
+    <span>Hand</span>
+  </button>
+
+  {/* REACTIONS */}
+  <div className="relative">
+    <button
+      onClick={() => setShowReactionMenu(!showReactionMenu)}
+      className="control-btn"
+    >
+      <SmilePlus size={18} />
+      <span>React</span>
+    </button>
+
+    {showReactionMenu && (
+      <div className="absolute bottom-14 left-1/2 -translate-x-1/2 bg-slate-800 p-2 rounded-xl flex gap-2 shadow-lg">
+        {["👍", "❤️", "😂", "🎉", "🔥"].map((e) => (
+          <button
+            key={e}
+            onClick={() => {
+              sendReaction(e);
+              setShowReactionMenu(false);
+            }}
+            className="text-2xl hover:scale-150 transition-transform"
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+    )}
+  </div>
+
+  {/* LEAVE */}
+  <button
+    onClick={leave}
+    className="px-5 py-2 rounded-full bg-red-600 hover:bg-red-700 flex items-center gap-2 text-sm font-semibold"
+  >
+    <LogOut size={18} />
+    Leave
+  </button>
+
+</div>
+
       </div>
 
-      {/* RIGHT AREA: desktop chat (always visible on md+) */}
-      <div className="hidden md:flex">
-        <ChatSidebar
-          user={user}
-          selfSocketId={selfSocketId}
-          participants={participants}
-          messages={messages}
-          chatInput={chatInput}
-          setChatInput={setChatInput}
-          sendMessage={sendMessage}
-          notifyTyping={notifyTyping}
-          typingUser={typingUser}
-          selectedTarget={selectedTarget}
-          onSelectTarget={handleSelectTarget}
-        />
-      </div>
-
-      {/* Mobile chat overlay */}
-      {showMobileChat && (
-        <div className="fixed inset-0 z-40 bg-slate-950/90 flex md:hidden">
-          <div className="flex-1 max-w-md mx-auto my-4">
-            <ChatSidebar
-              user={user}
-              selfSocketId={selfSocketId}
-              participants={participants}
-              messages={messages}
-              chatInput={chatInput}
-              setChatInput={setChatInput}
-              sendMessage={sendMessage}
-              notifyTyping={notifyTyping}
-              typingUser={typingUser}
-              selectedTarget={selectedTarget}
-              onSelectTarget={handleSelectTarget}
-              isMobile
-              onClose={handleToggleChat}
-            />
-          </div>
-        </div>
-      )}
+      {/* RIGHT AREA (Chat) */}
+      <ChatSidebar
+        messages={messages}
+        chatInput={chatInput}
+        setChatInput={setChatInput}
+        sendMessage={sendMessage}
+      />
     </div>
   );
 }

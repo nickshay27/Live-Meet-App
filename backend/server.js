@@ -98,25 +98,9 @@ const start = async () => {
       io.to(to).emit("webrtc-ice-candidate", { from: socket.id, candidate });
     });
 
-// existing
-socket.on("chat-message", ({ code, message }) => {
-  // PRIVATE DM
-  if (message.to && message.to !== "all") {
-    io.to(message.to).emit("chat-message", message);
-  } else {
-    // PUBLIC MESSAGE TO ROOM
-    socket.to(code).emit("chat-message", message);
-  }
-});
-
-// NEW: typing indicator
-socket.on("typing", ({ code }) => {
-  socket.to(code).emit("typing", {
-    from: socket.id,
-    userId: socket.user.id,
-    name: socket.user.name,
-  });
-});
+    socket.on("chat-message", ({ code, message }) => {
+      socket.to(code).emit("chat-message", message);
+    });
 
     socket.on("reaction", ({ code, emoji, user }) => {
   io.to(code).emit("reaction", { user, emoji });
