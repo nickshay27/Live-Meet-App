@@ -10,13 +10,19 @@ export async function initDb() {
       user: config.db.user,
       password: config.db.password,
       database: config.db.name,
+      port: config.db.port || 4000,
       waitForConnections: true,
       connectionLimit: 10,
-      queueLimit: 0
+      queueLimit: 0,
+
+      // 🔥 REQUIRED for TiDB Cloud — ENABLE SSL
+      ssl: {
+        minVersion: "TLSv1.2",
+        rejectUnauthorized: true,
+      },
     });
   }
 
-  // Create tables if they don't exist
   const conn = await pool.getConnection();
   try {
     await conn.query(`
