@@ -4,7 +4,7 @@ import { useAuth } from "./AuthContext.jsx";
 
 const SocketContext = createContext(null);
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const API_URL = import.meta.env.VITE_API_URL || "https://live-meet-app-2.onrender.com";
 
 export function SocketProvider({ children }) {
   const { token } = useAuth();

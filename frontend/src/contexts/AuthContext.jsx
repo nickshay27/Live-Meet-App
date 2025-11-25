@@ -3,7 +3,7 @@ import axios from "axios";
 
 const AuthContext = createContext(null);
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const API_URL = import.meta.env.VITE_API_URL || "https://live-meet-app-2.onrender.com";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
