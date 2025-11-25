@@ -102,6 +102,10 @@ const start = async () => {
       socket.to(code).emit("chat-message", message);
     });
 
+    socket.on("reaction", ({ code, emoji, user }) => {
+  io.to(code).emit("reaction", { user, emoji });
+});
+
     socket.on("disconnecting", () => {
       for (const code of socket.rooms) {
         if (code === socket.id) continue;

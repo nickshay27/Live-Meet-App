@@ -9,3 +9,18 @@ body {
 input, button, textarea, select {
   @apply outline-none;
 }
+
+.control-btn {
+  @apply flex flex-col items-center justify-center px-4 py-2 rounded-xl bg-slate-800 text-slate-200 hover:bg-slate-700 transition gap-1 text-xs;
+}
+
+
+@keyframes bounce {
+  0%   { transform: translate(-50%, 0); }
+  50%  { transform: translate(-50%, -25px); }
+  100% { transform: translate(-50%, 0); }
+}
+
+.animate-bounce {
+  animation: bounce 1s ease-in-out infinite;
+}
