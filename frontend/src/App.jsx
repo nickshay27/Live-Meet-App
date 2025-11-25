@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
-import MeetingRoom from "./pages/MeetingRoom.jsx";
+import MeetingRoom from "./meeting/MeetingRoom.jsx";
 import CreateMeeting from "./pages/CreateMeeting.jsx";
 import JoinMeeting from "./pages/JoinMeeting.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";

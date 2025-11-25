@@ -24,3 +24,18 @@ input, button, textarea, select {
 .animate-bounce {
   animation: bounce 1s ease-in-out infinite;
 }
+
+@keyframes floatUp {
+  0% {
+    transform: translate(-50%, 40px);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -120px);
+    opacity: 0;
+  }
+}
+
+.animate-float {
+  animation: floatUp 1.8s ease-out forwards;
+}

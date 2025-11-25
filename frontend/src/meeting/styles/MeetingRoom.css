@@ -1,0 +1,68 @@
+/* MAIN LAYOUT */
+.meeting-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 2fr 1fr;
+  height: calc(100vh - 80px);
+}
+
+/* LEFT SECTION */
+.video-area {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* CHAT RIGHT SIDEBAR */
+.chat-sidebar {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* FOOTER CONTROL BAR */
+.control-bar {
+  padding: 16px;
+  border-top: 1px solid #1e293b;
+  background: #0f172a;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+}
+
+/* BUTTONS */
+.ctrl-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: #1e293b;
+  border-radius: 12px;
+  font-size: 14px;
+  color: white;
+  transition: 0.2s ease;
+}
+
+.ctrl-btn:hover {
+  background: #334155;
+  transform: scale(1.05);
+}
+
+/* LEAVE BUTTON */
+.leave-btn {
+  background: #dc2626;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: bold;
+}
+
+.leave-btn:hover {
+  background: #b91c1c;
+}
