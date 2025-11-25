@@ -27,6 +27,8 @@ export default function useWebRTC() {
   const peerConnectionsRef = useRef({});
   const [remoteStreams, setRemoteStreams] = useState({});
 
+  const [chatTarget, setChatTarget] = useState("everyone");
+
   /* ----------------------------------------------------------
    * FETCH MEETING DETAILS
    * --------------------------------------------------------*/
@@ -229,20 +231,54 @@ export default function useWebRTC() {
   /* ----------------------------------------------------------
    * CHAT SEND
    * --------------------------------------------------------*/
-  const sendMessage = () => {
-    if (!chatInput.trim()) return;
-    const msg = {
-      id: Date.now(),
-      user: { id: user.id, name: user.name },
-      text: chatInput.trim(),
-      ts: new Date().toISOString()
-    };
+//   const sendMessage = () => {
+//     if (!chatInput.trim()) return;
+//     const msg = {
+//       id: Date.now(),
+//       user: { id: user.id, name: user.name },
+//       text: chatInput.trim(),
+//       ts: new Date().toISOString()
+//     };
 
-    socket.emit("chat-message", { code, message: msg });
-    setMessages(prev => [...prev, msg]);
-    setChatInput("");
+//     socket.emit("chat-message", { code, message: msg });
+//     setMessages(prev => [...prev, msg]);
+//     setChatInput("");
+//   };
+
+useEffect(() => {
+  if (!socket) return;
+
+  socket.on("private-message", (msg) => {
+    setMessages((prev) => [...prev, { ...msg, private: true }]);
+  });
+
+  return () => {
+    socket.off("private-message");
+  };
+}, [socket]);
+
+const sendMessage = () => {
+  if (!chatInput.trim()) return;
+
+  const msg = {
+    id: Date.now(),
+    user: { id: user.id, name: user.name },
+    text: chatInput.trim(),
+    ts: new Date().toISOString(),
+    target: chatTarget
   };
 
+  if (chatTarget === "everyone") {
+    socket.emit("chat-message", { code, message: msg });
+  } else {
+    socket.emit("private-message", { to: chatTarget, message: msg });
+  }
+
+  // Add message to local chat
+  setMessages((prev) => [...prev, msg]);
+
+  setChatInput("");
+};
   /* ----------------------------------------------------------
    * MIC / CAMERA TOGGLE
    * --------------------------------------------------------*/
@@ -324,6 +360,9 @@ export default function useWebRTC() {
     sendMessage,
 
     leave,
-    error
+    error,
+
+    chatTarget,
+    setChatTarget,
   };
 }

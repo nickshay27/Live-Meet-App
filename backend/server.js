@@ -106,6 +106,14 @@ const start = async () => {
   io.to(code).emit("reaction", { user, emoji });
 });
 
+socket.on("private-message", ({ to, message }) => {
+  io.to(to).emit("private-message", {
+    ...message,
+    from: socket.id,
+  });
+});
+
+
     socket.on("disconnecting", () => {
       for (const code of socket.rooms) {
         if (code === socket.id) continue;
