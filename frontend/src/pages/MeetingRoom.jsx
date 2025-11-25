@@ -41,8 +41,13 @@ export default function MeetingRoom() {
     const setupMediaAndJoin = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: true
+          audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
+        video: true
+
         });
         localStreamRef.current = stream;
         if (localVideoRef.current) {
@@ -129,6 +134,7 @@ export default function MeetingRoom() {
       }
 
       pc.ontrack = (event) => {
+          console.log("Incoming tracks:", event.streams[0].getTracks());
         const [stream] = event.streams;
         setRemoteStreams((prev) => ({
           ...prev,
@@ -338,14 +344,31 @@ function RemoteVideo({ stream, user }) {
   const ref = useRef(null);
 
   useEffect(() => {
-    if (ref.current && stream) {
-      ref.current.srcObject = stream;
-    }
+    if (!ref.current || !stream) return;
+
+    ref.current.srcObject = stream;
+
+    const video = ref.current;
+
+    const tryPlay = () => {
+      video.play().catch((e) => {
+        console.log("Autoplay blocked, waiting for user click...");
+      });
+    };
+
+    video.onloadedmetadata = tryPlay;
+    tryPlay();
   }, [stream]);
 
   return (
     <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
-      <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />
+      <video
+        ref={ref}
+        autoPlay
+        playsInline
+        className="w-full h-full object-cover"
+        muted={false}
+      />
       <div className="absolute bottom-1 left-1 text-[11px] px-2 py-0.5 rounded-full bg-slate-900/70">
         {user?.name || "Guest"}
       </div>
