@@ -120,65 +120,91 @@ export default function MeetingRoom() {
       }
     };
 
-    const createPeerConnection = (remoteSocketId) => {
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" }
-        ]
-      });
+const createPeerConnection = (remoteSocketId) => {
+  const pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  });
 
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => {
-          pc.addTrack(track, localStreamRef.current);
-        });
-      }
+  // Add local cam + mic
+  if (localStreamRef.current) {
+    localStreamRef.current.getTracks().forEach((track) => {
+      pc.addTrack(track, localStreamRef.current);
+    });
+  }
 
-      pc.ontrack = (event) => {
-          console.log("Incoming tracks:", event.streams[0].getTracks());
-        const [stream] = event.streams;
-        setRemoteStreams((prev) => ({
-          ...prev,
-          [remoteSocketId]: stream
-        }));
-      };
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("webrtc-ice-candidate", {
-            to: remoteSocketId,
-            candidate: event.candidate
-          });
-        }
-      };
-
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
-          setRemoteStreams((prev) => {
-            const copy = { ...prev };
-            delete copy[remoteSocketId];
-            return copy;
-          });
-        }
-      };
-
-      peerConnectionsRef.current[remoteSocketId] = pc;
-      return pc;
-    };
-
-    const createOfferFor = async (remoteSocketId) => {
-      const pc = createPeerConnection(remoteSocketId);
+  // 🔥 FIXED — two-way audio/video renegotiation
+  pc.onnegotiationneeded = async () => {
+    try {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      socket.emit("webrtc-offer", { to: remoteSocketId, offer });
-    };
 
-    const createAnswerFor = async (remoteSocketId, offer) => {
-      const pc = createPeerConnection(remoteSocketId);
-      await pc.setRemoteDescription(offer);
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      socket.emit("webrtc-answer", { to: remoteSocketId, answer });
-    };
+      socket.emit("webrtc-offer", {
+        to: remoteSocketId,
+        offer,
+      });
+    } catch (err) {
+      console.error("Renegotiation error:", err);
+    }
+  };
+
+  // Incoming remote media
+  pc.ontrack = (event) => {
+    const [stream] = event.streams;
+    setRemoteStreams((prev) => ({
+      ...prev,
+      [remoteSocketId]: stream,
+    }));
+  };
+
+  pc.onicecandidate = (event) => {
+    if (event.candidate) {
+      socket.emit("webrtc-ice-candidate", {
+        to: remoteSocketId,
+        candidate: event.candidate,
+      });
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+      setRemoteStreams((prev) => {
+        const copy = { ...prev };
+        delete copy[remoteSocketId];
+        return copy;
+      });
+    }
+  };
+
+  peerConnectionsRef.current[remoteSocketId] = pc;
+  return pc;
+};
+
+
+  
+
+    const createOfferFor = async (remoteSocketId) => {
+  let pc = peerConnectionsRef.current[remoteSocketId];
+  if (!pc) pc = createPeerConnection(remoteSocketId);
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  socket.emit("webrtc-offer", { to: remoteSocketId, offer });
+};
+
+
+const createAnswerFor = async (remoteSocketId, offer) => {
+  let pc = peerConnectionsRef.current[remoteSocketId];
+  if (!pc) pc = createPeerConnection(remoteSocketId);
+
+  await pc.setRemoteDescription(offer);
+
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+
+  socket.emit("webrtc-answer", { to: remoteSocketId, answer });
+};
+
 
     // expose helpers
     MeetingRoom._internal = { createOfferFor, createAnswerFor };
@@ -217,13 +243,22 @@ export default function MeetingRoom() {
     setChatInput("");
   };
 
-  const toggleTrack = (kind) => {
-    const stream = localStreamRef.current;
-    if (!stream) return;
-    const track = stream.getTracks().find((t) => t.kind === kind);
-    if (!track) return;
-    track.enabled = !track.enabled;
-  };
+const toggleTrack = (kind) => {
+  const stream = localStreamRef.current;
+  if (!stream) return;
+
+  const track = stream.getTracks().find(t => t.kind === kind);
+  if (!track) return;
+
+  // Toggle
+  track.enabled = !track.enabled;
+
+  // Replace remote track
+  Object.values(peerConnectionsRef.current).forEach((pc) => {
+    const sender = pc.getSenders().find(s => s.track?.kind === track.kind);
+    if (sender) sender.replaceTrack(track);
+  });
+};
 
   const leave = () => {
     navigate("/");
@@ -242,6 +277,45 @@ export default function MeetingRoom() {
       </div>
     );
   }
+
+  const toggleScreenShare = async () => {
+  if (!localStreamRef.current) return;
+
+  try {
+    const screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false
+    });
+
+    const screenTrack = screenStream.getVideoTracks()[0];
+
+    Object.values(peerConnectionsRef.current).forEach((pc) => {
+      const sender = pc.getSenders().find(s => s.track?.kind === "video");
+      if (sender) sender.replaceTrack(screenTrack);
+    });
+
+    screenTrack.onended = () => {
+      const camTrack = localStreamRef.current.getVideoTracks()[0];
+      Object.values(peerConnectionsRef.current).forEach((pc) => {
+        const sender = pc.getSenders().find(s => s.track?.kind === "video");
+        if (sender) sender.replaceTrack(camTrack);
+      });
+    };
+
+  } catch (err) {
+    console.error("Screen share error:", err);
+  }
+};
+
+const raiseHand = () => {
+  socket.emit("reaction", { code, emoji: "✋", user: user.name });
+};
+
+const sendReaction = (emoji) => {
+  socket.emit("reaction", { code, emoji, user: user.name });
+};
+
+
 
   return (
     <div className="grid gap-4 md:grid-cols-[2fr,1fr] h-[calc(100vh-80px)]">
@@ -276,26 +350,58 @@ export default function MeetingRoom() {
             <RemoteVideo key={socketId} stream={stream} user={participants[socketId]} />
           ))}
         </div>
-        <footer className="px-4 py-3 border-t border-slate-800 flex items-center justify-center gap-3">
-          <button
-            onClick={() => toggleTrack("audio")}
-            className="px-3 py-1.5 text-xs rounded-full bg-slate-800 hover:bg-slate-700"
-          >
-            Toggle Mic
-          </button>
-          <button
-            onClick={() => toggleTrack("video")}
-            className="px-3 py-1.5 text-xs rounded-full bg-slate-800 hover:bg-slate-700"
-          >
-            Toggle Camera
-          </button>
-          <button
-            onClick={leave}
-            className="px-3 py-1.5 text-xs rounded-full bg-red-600 hover:bg-red-700"
-          >
-            Leave
-          </button>
-        </footer>
+<footer className="px-4 py-4 border-t border-slate-800 flex items-center justify-center gap-5">
+
+  {/* MIC BUTTON */}
+  <button
+    onClick={() => toggleTrack("audio")}
+    className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700"
+  >
+    🎤 Mic
+  </button>
+
+  {/* CAMERA BUTTON */}
+  <button
+    onClick={() => toggleTrack("video")}
+    className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700"
+  >
+    📷 Camera
+  </button>
+
+  {/* SCREEN SHARE BUTTON */}
+  <button
+    onClick={toggleScreenShare}
+    className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700"
+  >
+    📺 Share
+  </button>
+
+  {/* RAISE HAND */}
+  <button
+    onClick={raiseHand}
+    className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700"
+  >
+    ✋ Hand
+  </button>
+
+  {/* EMOJI REACTIONS */}
+  <div className="flex gap-2">
+    <button onClick={() => sendReaction("👍")} className="px-3 py-2 text-xl">👍</button>
+    <button onClick={() => sendReaction("❤️")} className="px-3 py-2 text-xl">❤️</button>
+    <button onClick={() => sendReaction("😂")} className="px-3 py-2 text-xl">😂</button>
+    <button onClick={() => sendReaction("🎉")} className="px-3 py-2 text-xl">🎉</button>
+  </div>
+
+  {/* LEAVE BUTTON */}
+  <button
+    onClick={leave}
+    className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-600 hover:bg-red-700"
+  >
+    🚪 Leave
+  </button>
+
+</footer>
+
       </div>
 
       <aside className="bg-slate-900 border border-slate-800 rounded-2xl flex flex-col">
