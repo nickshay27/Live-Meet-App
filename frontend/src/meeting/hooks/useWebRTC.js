@@ -213,7 +213,7 @@ const pc = new RTCPeerConnection({
     username: "dcd4ef71add2cf037c05b635",
     credential: "+orXegGVTJCFptMQ",
   },
-];
+]
 
 });
 
