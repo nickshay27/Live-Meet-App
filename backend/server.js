@@ -110,6 +110,14 @@ socket.on("private-message", ({ to, message }) => {
   io.to(to).emit("private-message", {
     ...message,
     from: socket.id,
+    fromUser: socket.user.name,
+  });
+
+  io.to(to).emit("dm-notification", {
+    fromSocketId: socket.id,
+    fromUser: socket.user.name,
+    text: message.text,
+    ts: message.ts,
   });
 });
 

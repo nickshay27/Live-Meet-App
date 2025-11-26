@@ -19,26 +19,43 @@ import {
   LogOut
 } from "lucide-react";
 import { useParams } from "react-router-dom";
+import { useState } from "react";
+
 
 
 export default function MeetingRoom() {
   const {
-    meeting,
-    participants,
-    localVideoRef,
-    remoteStreams,
-    messages,
-    chatInput,
-    setChatInput,
-    sendMessage,
-    micOn,
-    cameraOn,
-    toggleTrack,
-    screenSharing,
-    toggleScreenShare,
-    leave,
-    error
-  } = useWebRTC();
+  meeting,
+  participants,
+  localVideoRef,
+  remoteStreams,
+
+  messages,
+  chatInput,
+  setChatInput,
+  sendMessage,
+
+  micOn,
+  cameraOn,
+  toggleTrack,
+
+  screenSharing,
+  toggleScreenShare,
+
+  leave,
+  error,
+
+  // 🔥 DM / PRIVATE CHAT ADDED
+  chatTarget,
+  setChatTarget,
+  dmMessages,
+  activeDM,
+  setActiveDM,
+  unreadDM,
+  dmTyping,
+  sendTyping,
+} = useWebRTC();
+
 
   const {
     showReactionMenu,
@@ -59,6 +76,16 @@ export default function MeetingRoom() {
     );
   }
 
+  const handleVideoUserClick = (socketId) => {
+  // ignore self for now or could open self DM in future
+  if (socketId === "self") return;
+
+  // open DM with clicked user
+  setChatTarget(socketId);
+  setActiveDM(socketId);
+};
+
+
   return (
     <div className="meeting-layout">
 
@@ -71,6 +98,7 @@ export default function MeetingRoom() {
           localVideoRef={localVideoRef}
           remoteStreams={remoteStreams}
           participants={participants}
+          onUserClick={handleVideoUserClick}
         />
 
         <ReactionMenu
@@ -160,12 +188,26 @@ export default function MeetingRoom() {
       </div>
 
       {/* RIGHT AREA (Chat) */}
-      <ChatSidebar
-        messages={messages}
-        chatInput={chatInput}
-        setChatInput={setChatInput}
-        sendMessage={sendMessage}
-      />
+     <ChatSidebar
+  messages={messages}
+  dmMessages={dmMessages}
+  participants={participants}
+
+  chatInput={chatInput}
+  setChatInput={setChatInput}
+  sendMessage={sendMessage}
+
+  chatTarget={chatTarget}
+  setChatTarget={setChatTarget}
+
+  activeDM={activeDM}
+  setActiveDM={setActiveDM}
+
+  unreadDM={unreadDM}
+  dmTyping={dmTyping}
+  sendTyping={sendTyping}
+/>
+
     </div>
   );
 }

@@ -14,8 +14,17 @@ export default function useWebRTC() {
   const [error, setError] = useState("");
 
   const [participants, setParticipants] = useState({});
+
+  // PUBLIC CHAT (meeting-wide)
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
+
+  // PRIVATE CHAT STATE
+  const [chatTarget, setChatTarget] = useState("everyone"); // "everyone" or socketId
+  const [dmMessages, setDmMessages] = useState({});          // { socketId: [msgs] }
+  const [activeDM, setActiveDM] = useState(null);            // active DM socketId
+  const [unreadDM, setUnreadDM] = useState({});              // { socketId: count }
+  const [dmTyping, setDmTyping] = useState({});              // { socketId: bool }
 
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
@@ -26,8 +35,6 @@ export default function useWebRTC() {
 
   const peerConnectionsRef = useRef({});
   const [remoteStreams, setRemoteStreams] = useState({});
-
-  const [chatTarget, setChatTarget] = useState("everyone");
 
   /* ----------------------------------------------------------
    * FETCH MEETING DETAILS
@@ -58,9 +65,9 @@ export default function useWebRTC() {
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
-            autoGainControl: true
+            autoGainControl: true,
           },
-          video: true
+          video: true,
         });
 
         localStreamRef.current = stream;
@@ -70,33 +77,33 @@ export default function useWebRTC() {
 
         socket.emit("join-room", {
           code,
-          user: { id: user.id, name: user.name }
+          user: { id: user.id, name: user.name },
         });
 
         socket.on("room-users", ({ users }) => {
           const map = {};
-          users.forEach(u => {
+          users.forEach((u) => {
             map[u.socketId] = u;
           });
           setParticipants(map);
         });
 
         socket.on("user-joined", ({ user: joinedUser }) => {
-          setParticipants(prev => ({
+          setParticipants((prev) => ({
             ...prev,
-            [joinedUser.socketId]: joinedUser
+            [joinedUser.socketId]: joinedUser,
           }));
           createOffer(joinedUser.socketId);
         });
 
         socket.on("user-left", ({ socketId }) => {
-          setParticipants(prev => {
+          setParticipants((prev) => {
             const cp = { ...prev };
             delete cp[socketId];
             return cp;
           });
 
-          setRemoteStreams(prev => {
+          setRemoteStreams((prev) => {
             const cp = { ...prev };
             delete cp[socketId];
             return cp;
@@ -129,9 +136,48 @@ export default function useWebRTC() {
           }
         });
 
-        socket.on("chat-message", msg => {
-          setMessages(prev => [...prev, msg]);
+        // PUBLIC CHAT
+        socket.on("chat-message", (msg) => {
+          setMessages((prev) => [...prev, msg]);
         });
+
+       // PRIVATE MESSAGE
+socket.on("private-message", (msg) => {
+  // store in DM threads
+  setDmMessages((prev) => ({
+    ...prev,
+    [msg.from]: [...(prev[msg.from] || []), msg],
+  }));
+
+  // also log in global timeline (optional)
+  setMessages((prev) => [...prev, { ...msg, isPrivate: true }]);
+
+  // 🔔 Play notification sound for incoming DM
+  try {
+    const audio = new Audio("/sounds/dm.mp3"); // place file in public/sounds/dm.mp3
+    audio.play().catch(() => {});
+  } catch (e) {
+    console.log("Notification sound error:", e);
+  }
+
+  // unread counter if chat not active
+  if (activeDM !== msg.from) {
+    setUnreadDM((prev) => ({
+      ...prev,
+      [msg.from]: (prev[msg.from] || 0) + 1,
+    }));
+  }
+});
+
+
+        // TYPING INDICATOR FOR DM
+        socket.on("typing", ({ from, isTyping }) => {
+          setDmTyping((prev) => ({
+            ...prev,
+            [from]: isTyping,
+          }));
+        });
+
       } catch (err) {
         console.error(err);
         setError("Could not access camera/microphone");
@@ -141,31 +187,30 @@ export default function useWebRTC() {
     /* ---------------------------
      * CREATE PEER CONNECTION
      * -------------------------*/
-    const createPeerConnection = socketId => {
+    const createPeerConnection = (socketId) => {
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
       });
 
-      // Add local tracks
       if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => {
+        localStreamRef.current.getTracks().forEach((track) => {
           pc.addTrack(track, localStreamRef.current);
         });
       }
 
-      pc.ontrack = event => {
+      pc.ontrack = (event) => {
         const [stream] = event.streams;
-        setRemoteStreams(prev => ({
+        setRemoteStreams((prev) => ({
           ...prev,
-          [socketId]: stream
+          [socketId]: stream,
         }));
       };
 
-      pc.onicecandidate = event => {
+      pc.onicecandidate = (event) => {
         if (event.candidate) {
           socket.emit("webrtc-ice-candidate", {
             to: socketId,
-            candidate: event.candidate
+            candidate: event.candidate,
           });
         }
       };
@@ -177,7 +222,7 @@ export default function useWebRTC() {
     /* ---------------------------
      * OFFER + ANSWER HANDLING
      * -------------------------*/
-    const createOffer = async socketId => {
+    const createOffer = async (socketId) => {
       let pc = peerConnectionsRef.current[socketId];
       if (!pc) pc = createPeerConnection(socketId);
 
@@ -199,14 +244,10 @@ export default function useWebRTC() {
       socket.emit("webrtc-answer", { to: socketId, answer });
     };
 
-    // expose internal for debugging
     useWebRTC._internal = { createOffer, createAnswer };
 
     setupMediaAndJoin();
 
-    /* ---------------------------
-     * CLEANUP
-     * -------------------------*/
     return () => {
       if (socket) {
         socket.emit("leave-room", { code });
@@ -217,76 +258,78 @@ export default function useWebRTC() {
         socket.off("webrtc-answer");
         socket.off("webrtc-ice-candidate");
         socket.off("chat-message");
+        socket.off("private-message");
+        socket.off("typing");
       }
 
-      Object.values(peerConnectionsRef.current).forEach(pc => pc.close());
+      Object.values(peerConnectionsRef.current).forEach((pc) => pc.close());
       peerConnectionsRef.current = {};
 
       if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(t => t.stop());
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
-  }, [socket, code, user]);
+  }, [socket, code, user, activeDM]);
 
   /* ----------------------------------------------------------
-   * CHAT SEND
+   * SEND MESSAGE (PUBLIC or PRIVATE)
    * --------------------------------------------------------*/
-//   const sendMessage = () => {
-//     if (!chatInput.trim()) return;
-//     const msg = {
-//       id: Date.now(),
-//       user: { id: user.id, name: user.name },
-//       text: chatInput.trim(),
-//       ts: new Date().toISOString()
-//     };
+  const sendMessage = () => {
+    if (!chatInput.trim() || !socket) return;
 
-//     socket.emit("chat-message", { code, message: msg });
-//     setMessages(prev => [...prev, msg]);
-//     setChatInput("");
-//   };
+    const msg = {
+      id: Date.now(),
+      user: { id: user.id, name: user.name },
+      text: chatInput.trim(),
+      ts: new Date().toISOString(),
+      target: chatTarget,
+    };
 
-useEffect(() => {
-  if (!socket) return;
+    if (chatTarget === "everyone") {
+      socket.emit("chat-message", { code, message: msg });
+      setMessages((prev) => [...prev, msg]);
+    } else {
+      // PRIVATE MESSAGE
+      socket.emit("private-message", { to: chatTarget, message: msg });
 
-  socket.on("private-message", (msg) => {
-    setMessages((prev) => [...prev, { ...msg, private: true }]);
-  });
+      // store in local DM thread
+      setDmMessages((prev) => ({
+        ...prev,
+        [chatTarget]: [
+          ...(prev[chatTarget] || []),
+          { ...msg, from: "self", fromUser: user.name },
+        ],
+      }));
 
-  return () => {
-    socket.off("private-message");
+      // optional: also log to global timeline
+      setMessages((prev) => [...prev, { ...msg, isPrivate: true }]);
+    }
+
+    setChatInput("");
+    // stop typing indication
+    if (chatTarget !== "everyone") {
+      sendTyping(false);
+    }
   };
-}, [socket]);
 
-const sendMessage = () => {
-  if (!chatInput.trim()) return;
+  /* ----------------------------------------------------------
+   * TYPING INDICATOR
+   * --------------------------------------------------------*/
+  const sendTyping = (isTyping) => {
+    if (!socket) return;
+    if (chatTarget === "everyone") return;
 
-  const msg = {
-    id: Date.now(),
-    user: { id: user.id, name: user.name },
-    text: chatInput.trim(),
-    ts: new Date().toISOString(),
-    target: chatTarget
+    socket.emit("typing", { to: chatTarget, isTyping });
   };
 
-  if (chatTarget === "everyone") {
-    socket.emit("chat-message", { code, message: msg });
-  } else {
-    socket.emit("private-message", { to: chatTarget, message: msg });
-  }
-
-  // Add message to local chat
-  setMessages((prev) => [...prev, msg]);
-
-  setChatInput("");
-};
   /* ----------------------------------------------------------
    * MIC / CAMERA TOGGLE
    * --------------------------------------------------------*/
-  const toggleTrack = kind => {
+  const toggleTrack = (kind) => {
     const stream = localStreamRef.current;
     if (!stream) return;
 
-    const track = stream.getTracks().find(t => t.kind === kind);
+    const track = stream.getTracks().find((t) => t.kind === kind);
     if (!track) return;
 
     track.enabled = !track.enabled;
@@ -294,8 +337,8 @@ const sendMessage = () => {
     if (kind === "audio") setMicOn(track.enabled);
     if (kind === "video") setCameraOn(track.enabled);
 
-    Object.values(peerConnectionsRef.current).forEach(pc => {
-      const sender = pc.getSenders().find(s => s.track?.kind === kind);
+    Object.values(peerConnectionsRef.current).forEach((pc) => {
+      const sender = pc.getSenders().find((s) => s.track?.kind === kind);
       if (sender) sender.replaceTrack(track);
     });
   };
@@ -307,15 +350,15 @@ const sendMessage = () => {
     if (!screenSharing) {
       try {
         const screen = await navigator.mediaDevices.getDisplayMedia({
-          video: true
+          video: true,
         });
 
         const screenTrack = screen.getVideoTracks()[0];
 
         setScreenSharing(true);
 
-        Object.values(peerConnectionsRef.current).forEach(pc => {
-          const sender = pc.getSenders().find(s => s.track?.kind === "video");
+        Object.values(peerConnectionsRef.current).forEach((pc) => {
+          const sender = pc.getSenders().find((s) => s.track?.kind === "video");
           if (sender) sender.replaceTrack(screenTrack);
         });
 
@@ -323,8 +366,8 @@ const sendMessage = () => {
           const camTrack = localStreamRef.current.getVideoTracks()[0];
           setScreenSharing(false);
 
-          Object.values(peerConnectionsRef.current).forEach(pc => {
-            const sender = pc.getSenders().find(s => s.track?.kind === "video");
+          Object.values(peerConnectionsRef.current).forEach((pc) => {
+            const sender = pc.getSenders().find((s) => s.track?.kind === "video");
             if (sender) sender.replaceTrack(camTrack);
           });
         };
@@ -362,7 +405,14 @@ const sendMessage = () => {
     leave,
     error,
 
+    // PRIVATE CHAT / DM STUFF
     chatTarget,
     setChatTarget,
+    dmMessages,
+    activeDM,
+    setActiveDM,
+    unreadDM,
+    dmTyping,
+    sendTyping,
   };
 }
