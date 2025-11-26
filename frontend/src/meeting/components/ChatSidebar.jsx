@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export default function ChatSidebar({
   messages,
@@ -31,6 +31,15 @@ export default function ChatSidebar({
         : messages.filter((m) => m.target === "everyone"),
     [isDM, dmMessages, chatTarget, messages]
   );
+
+  const messagesEndRef = useRef(null);
+
+useEffect(() => {
+  if (messagesEndRef.current) {
+    messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }
+}, [messages, dmMessages, chatTarget]);
+
 
   // apply search filter
   const filteredMessages = useMemo(() => {
@@ -138,7 +147,12 @@ export default function ChatSidebar({
       </div>
 
       {/* MESSAGES */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3 text-xs">
+      {/* <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3 text-xs"> */}
+      <div
+  className="flex-1 px-3 py-4 space-y-3 text-xs overflow-y-auto scroll-smooth"
+  style={{ maxHeight: "100%", scrollbarWidth: "thin" }}
+>
+
         {visibleMessages.length === 0 && (
           <p className="text-slate-500 text-center mt-4 text-[11px]">
             No messages yet.
@@ -194,6 +208,7 @@ export default function ChatSidebar({
             Typing…
           </div>
         )}
+          <div ref={messagesEndRef}></div>
       </div>
 
       {/* INPUT */}

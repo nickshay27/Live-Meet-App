@@ -188,9 +188,23 @@ socket.on("private-message", (msg) => {
      * CREATE PEER CONNECTION
      * -------------------------*/
     const createPeerConnection = (socketId) => {
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-      });
+const pc = new RTCPeerConnection({
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    {
+      urls: "turn:global.relay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:global.relay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+  ],
+});
+
+
 
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => {
