@@ -190,18 +190,31 @@ socket.on("private-message", (msg) => {
     const createPeerConnection = (socketId) => {
 const pc = new RTCPeerConnection({
   iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    {
-      urls: "turn:global.relay.metered.ca:80",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: "turn:global.relay.metered.ca:443",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-  ],
+  {
+    urls: "stun:stun.metered.ca:80",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:80",
+    username: "dcd4ef71add2cf037c05b635",
+    credential: "+orXegGVTJCFptMQ",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+    username: "dcd4ef71add2cf037c05b635",
+    credential: "+orXegGVTJCFptMQ",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:443",
+    username: "dcd4ef71add2cf037c05b635",
+    credential: "+orXegGVTJCFptMQ",
+  },
+  {
+    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+    username: "dcd4ef71add2cf037c05b635",
+    credential: "+orXegGVTJCFptMQ",
+  },
+];
+
 });
 
 
